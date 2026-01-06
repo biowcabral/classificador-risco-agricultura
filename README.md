@@ -1,137 +1,148 @@
-# 🚜 Sistema de Classificação de Risco de Desperdício Agrícola
+# 🌾 Classificador de Risco de Desperdício Agrícola
 
-## 📋 Descrição
+Sistema completo de análise e classificação de risco de desperdício agrícola utilizando Machine Learning, com análise comparativa de 7 modelos e visualização interativa.
 
-Sistema de Machine Learning para classificação de municípios brasileiros em categorias de risco de desperdício agrícola, baseado em dados do Valor Bruto da Produção (VBP) 2024. O sistema utiliza algoritmo Random Forest para categorizar municípios em três níveis: **BAIXO**, **MÉDIO** e **ALTO** risco.
+## 📊 Resultados Principais
 
-## 🎯 Objetivos
+- **Melhor Modelo:** Decision Tree - **98.58%** de Accuracy
+- **Dados Analisados:** 13 anos (2012-2024), 124.137 registros, 399 municípios
+- **Modelos Implementados:** 7 algoritmos de ML com análise comparativa completa
 
-- Identificar municípios com maior probabilidade de desperdício agrícola
-- Analisar padrões de produção, área plantada e diversidade produtiva
-- Gerar visualizações interativas para tomada de decisão
-- Fornecer insights para políticas públicas agrícolas
+## 🏗️ Arquitetura do Projeto (MVC)
 
-## 📊 Funcionalidades
+```
+classificador-risco-agricultura/
+│
+├── 📁 models/                          # MODEL - Lógica de ML e Processamento
+│   └── analise_rapida.py              # Script principal de análise ML
+│
+├── 📁 views/                           # VIEW - Interface e Visualização
+│   └── dashboard_final.html           # Dashboard interativo principal
+│
+├── 📁 controllers/                     # CONTROLLER - Orquestração e Execução
+│   └── executar_analise.py            # Script de controle e menu interativo
+│
+├── 📁 data/                            # Dados de Entrada e Saída
+│   ├── VBP*.xls                       # Dados brutos VBP 2012-2024
+│   ├── vbp*.xlsx                      # Dados brutos VBP recentes
+│   ├── comparacao_modelos.csv         # Resultados comparativos
+│   └── resultados_ml.json             # Resultados completos em JSON
+│
+├── 📁 outputs/                         # Visualizações e Gráficos
+│   ├── comparacao_metricas.png        # Comparação de métricas
+│   ├── confusion_matrix_melhor.png    # Matriz de confusão
+│   ├── feature_importance.png         # Importância de features (XAI)
+│   └── evolucao_temporal.png          # Evolução temporal
+│
+├── 📁 notebooks/                       # Notebooks Jupyter das Aulas
+│   └── Aula/                          # 11 notebooks de ML utilizados
+│
+├── 📁 docs/                            # Documentação
+│   ├── README_ML.md                   # Documentação técnica completa
+│   ├── GUIA_RAPIDO.md                 # Guia rápido de uso
+│   └── *.md                           # Outros documentos
+│
+└── 📁 obsoletos/                       # Arquivos Legados (não utilizados)
+    ├── analise_temporal_agricultura.py
+    ├── dashboard_*.html
+    └── ...                            # Scripts auxiliares antigos
+```
 
-### 🔍 Análise de Dados
-- **Diversidade Produtiva**: Cálculo do número de culturas por município
-- **Classificação de Risco**: Algoritmo baseado em quantis de produção
-- **Correlação de Variáveis**: Análise de relações entre indicadores
+## 🚀 Como Executar
 
-### 📈 Visualizações
-- Dashboard interativo com Plotly
-- Distribuição de risco por município
-- Análise por grupo de cultura
-- Matriz de correlação
-- Ranking de municípios de alto risco
-- Importância das variáveis no modelo
+### Opção 1: Execução Rápida (Recomendado)
 
-### 🤖 Machine Learning
-- **Algoritmo**: Random Forest Classifier
-- **Features**: Produção, área plantada, VBP, diversidade produtiva
-- **Métricas**: Acurácia, precisão, recall, F1-score
-- **Validação**: Train/test split com estratificação
+```bash
+# Instalar dependências
+pip install pandas numpy matplotlib seaborn scikit-learn xgboost
+
+# Executar análise completa
+python models/analise_rapida.py
+
+# Abrir dashboard
+start views/dashboard_final.html
+```
+
+### Opção 2: Menu Interativo
+
+```bash
+python controllers/executar_analise.py
+```
+
+## 📈 Modelos Implementados
+
+| Posição | Modelo               | Accuracy | F1-Score | Tempo   |
+|---------|---------------------|----------|----------|---------|
+| 🏆 1º   | Decision Tree       | 98.58%   | 98.58%   | 5.29s   |
+| 🥈 2º   | Gradient Boosting   | 98.44%   | 98.44%   | 107.51s |
+| 🥉 3º   | Random Forest       | 97.84%   | 97.84%   | 19.05s  |
+| 4º      | Extra Trees         | 65.78%   | 65.95%   | 6.37s   |
+| 5º      | KNN                 | 63.23%   | 63.05%   | 12.98s  |
+| 6º      | Naive Bayes         | 61.32%   | 59.48%   | 0.75s   |
+| 7º      | Logistic Regression | 57.57%   | 57.62%   | 13.73s  |
+
+## 🔍 Features Principais
+
+- **Feature Engineering:** 7 features derivadas (produtividade, VBP por hectare, etc.)
+- **Feature Selection:** SelectKBest, Feature Importance (XAI)
+- **Análise Temporal:** Evolução de 13 anos de dados agrícolas
+- **Interpretabilidade:** Análise detalhada do porquê de cada resultado
+
+## 📚 Metodologias Aplicadas (11 Aulas)
+
+1. **Iris Dataset** - KNN, Decision Tree
+2. **Diabetes** - Logistic Regression, Random Forest
+3. **Predictive Analytics** - Comparação de múltiplos modelos
+4. **Machine Failure** - Ensemble Methods (Voting, Bagging, Boosting)
+5. **Churn** - Neural Networks, SVM
+6. **Breast Cancer** - Feature Selection (RFE, SFS)
+7. **Wine Clustering** - K-Means
+8. **Health Ageing** - Hierarchical Clustering
+9. **Obesity** - PCA
+10. **XAI** - SHAP, Feature Importance
+11. **Groceries** - Association Rules
+
+## 📊 Dashboard Interativo
+
+O dashboard inclui 4 abas:
+
+1. **📊 Visão Geral** - Estatísticas e comparação visual
+2. **🤖 Modelos** - Tabela completa e métricas detalhadas
+3. **🔍 Features** - Importância e seleção de atributos
+4. **📖 Análise Detalhada** - Explicação completa de cada modelo
+
+## 🎯 Análise de Resultados
+
+### Por que Decision Tree venceu?
+
+- ✅ Capturou perfeitamente os **thresholds naturais** (quartis de produção)
+- ✅ **Interpretabilidade máxima** para stakeholders
+- ✅ **Rápido** (5.29s) para produção
+- ✅ Ideal para dados com **estrutura hierárquica clara**
+
+### Aplicações Recomendadas
+
+- **Produção:** Decision Tree (precisão + velocidade + interpretabilidade)
+- **Pesquisa:** Gradient Boosting (máxima precisão)
+- **Robustez:** Random Forest (equilibrado e resistente a outliers)
 
 ## 🛠️ Tecnologias Utilizadas
 
-```
-Python 3.13+
-├── pandas - Manipulação de dados
-├── numpy - Operações numéricas
-├── scikit-learn - Machine Learning
-├── plotly - Visualizações interativas
-├── matplotlib - Gráficos estáticos
-└── seaborn - Visualizações estatísticas
-```
+- **Python 3.x**
+- **Pandas, NumPy** - Manipulação de dados
+- **Scikit-learn** - Machine Learning
+- **Matplotlib, Seaborn** - Visualizações
+- **XGBoost** - Gradient Boosting avançado
+- **Chart.js** - Gráficos interativos no dashboard
 
-## 📂 Estrutura do Projeto
+## 📝 Licença
 
-```
-├── municipio_food_waste_risk_classifier.py     # Classificador básico
-├── municipio_food_waste_risk_classifier_detailed.py  # Versão detalhada
-├── dashboard_risco_agricultura.py              # Dashboard interativo
-├── DOCUMENTACAO_CLASSIFICADOR_RISCO.md         # Documentação técnica
-├── .gitignore                                  # Arquivos ignorados pelo Git
-└── README.md                                   # Este arquivo
-```
+Este projeto foi desenvolvido para análise de risco agrícola no Paraná.
 
-## 🚀 Como Usar
+## 👥 Contribuições
 
-### 1. Instalação de Dependências
-```bash
-pip install pandas numpy scikit-learn plotly matplotlib seaborn openpyxl
-```
-
-### 2. Executar Classificador Básico
-```bash
-python municipio_food_waste_risk_classifier.py
-```
-
-### 3. Gerar Dashboard Interativo
-```bash
-python dashboard_risco_agricultura.py
-```
-
-O dashboard será salvo como `dashboard_risco_agricultura.html` e pode ser aberto em qualquer navegador.
-
-## 📊 Dados Necessários
-
-O sistema requer um arquivo Excel (`vbp_2024.xlsx`) com as seguintes colunas:
-- **Município**: Nome do município
-- **Produção**: Volume de produção
-- **Área (ha)**: Área plantada em hectares
-- **VBP**: Valor Bruto da Produção
-- **Grupo**: Grupo da cultura
-- **Cultura**: Tipo de cultura
-
-## 🔬 Metodologia
-
-### Classificação de Risco
-O algoritmo classifica municípios baseado em score calculado através de quantis:
-
-- **Quantil inferior (33%)**: +1 ponto (risco)
-- **Quantil superior (66%)**: -1 ponto (proteção)
-- **Score ≥ 2**: ALTO risco
-- **Score ≤ -2**: BAIXO risco
-- **-1 < Score < 2**: MÉDIO risco
-
-### Variáveis Analisadas
-1. **Produção**: Volume total produzido
-2. **Área Plantada**: Extensão cultivada
-3. **Valor Bruto**: Valor econômico da produção
-4. **Diversidade Produtiva**: Número de culturas diferentes
-5. **Grupo de Cultura**: Categoria da cultura
-
-## 📈 Resultados Esperados
-
-- **Acurácia do Modelo**: ~85-90%
-- **Dashboard Interativo**: Visualizações em tempo real
-- **Relatórios**: Análises detalhadas por região e cultura
-- **Rankings**: Top municípios por categoria de risco
-
-## 🤝 Contribuições
-
-Contribuições são bem-vindas! Por favor:
-
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
-
-## 👥 Autores
-
-- **Rayanne** - *Pesquisa de Mestrado*
-- **Leonardo** - *Desenvolvimento e Implementação*
-
-## 📞 Contato
-
-Para dúvidas ou sugestões, entre em contato através dos issues do GitHub.
+Sistema desenvolvido com base em 11 aulas práticas de Machine Learning, integrando múltiplas metodologias e técnicas avançadas.
 
 ---
 
-🌾 *"Tecnologia a serviço da agricultura sustentável"* 🌾
+**Última atualização:** Janeiro 2026

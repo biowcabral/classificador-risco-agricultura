@@ -1,6 +1,16 @@
 # Arquivos de dados grandes
 *.xlsx
 *.xls
+data/*.xlsx
+data/*.xls
+
+# Resultados e outputs (podem ser regenerados)
+outputs/*.png
+data/resultados_ml.json
+data/comparacao_modelos.csv
+
+# HTMLs antigos (obsoletos mantidos apenas localmente)
+obsoletos/
 
 # Vídeos e arquivos multimídia
 *.mp4

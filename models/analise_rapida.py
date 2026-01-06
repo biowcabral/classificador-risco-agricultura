@@ -1,7 +1,7 @@
 """
 Sistema Avançado de Análise Temporal de Risco de Desperdício Agrícola
+Versão OTIMIZADA para Datasets Grandes
 Comparação Abrangente de Metodologias de Machine Learning
-Baseado nas Aulas 1-9: Iris, Diabetes, Predictive, Machine Failure, Churn, Wine Clustering, Health Ageing, Obesity, Breast Cancer XAI, Groceries
 Autor: Sistema de Classificação de Risco Agrícola
 Data: Janeiro 2026
 """
@@ -20,16 +20,16 @@ import os
 import re
 import json
 from datetime import datetime
+import time
 
 warnings.filterwarnings('ignore')
 
 # Importações para Machine Learning
-from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
                             confusion_matrix, classification_report, 
-                            ConfusionMatrixDisplay, roc_auc_score, roc_curve,
-                            silhouette_score, davies_bouldin_score, calinski_harabasz_score)
+                            ConfusionMatrixDisplay)
 
 # CLASSIFICAÇÃO
 from sklearn.neighbors import KNeighborsClassifier
@@ -43,20 +43,12 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neural_network import MLPClassifier
 
 # CLUSTERING
-from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
+from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 
-# FEATURE SELECTION
-from sklearn.feature_selection import RFE, SequentialFeatureSelector, SelectKBest, f_classif
-
-# ASSOCIATION RULES
-try:
-    from mlxtend.frequent_patterns import apriori, association_rules
-    from mlxtend.preprocessing import TransactionEncoder
-    MLXTEND_AVAILABLE = True
-except ImportError:
-    MLXTEND_AVAILABLE = False
-    print("⚠ mlxtend não disponível. Regras de associação desabilitadas.")
+# FEATURE SELECTION (apenas os rápidos)
+from sklearn.feature_selection import SelectKBest, f_classif
 
 # XGBoost
 try:
@@ -64,15 +56,6 @@ try:
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
-    print("⚠ XGBoost não disponível. Use: pip install xgboost")
-
-# SHAP para XAI
-try:
-    import shap
-    SHAP_AVAILABLE = True
-except ImportError:
-    SHAP_AVAILABLE = False
-    print("⚠ SHAP não disponível. XAI desabilitado. Use: pip install shap")
 
 # =============================================================================
 # CONFIGURAÇÕES GLOBAIS
@@ -90,11 +73,11 @@ RESULTADOS = {
 
 print("=" * 100)
 print(" " * 15 + "SISTEMA AVANÇADO DE ANÁLISE TEMPORAL DE RISCO AGRÍCOLA")
-print(" " * 20 + "Comparação Abrangente de Metodologias de ML")
+print(" " * 20 + "Versão OTIMIZADA - Comparação de Metodologias de ML")
 print("=" * 100)
 
 # =============================================================================
-# FUNÇÕES AUXILIARES - CARREGAMENTO DE DADOS
+# FUNÇÕES AUXILIARES
 # =============================================================================
 
 def padronizar_grupo_existente(grupo):
@@ -183,7 +166,6 @@ def padronizar_colunas(df, ano):
         'area': 'AREA_PLANTADA',
         'vbp': 'VALOR_BRUTO',
         'valor bruto': 'VALOR_BRUTO',
-        'valor bruto': 'VALOR_BRUTO',
         'cultura': 'CULTURA',
         'produto': 'CULTURA',
         'grupo': 'GRUPO_CULTURA',
@@ -194,7 +176,7 @@ def padronizar_colunas(df, ano):
     
     df_renamed = df.copy()
     for col_original in df.columns:
-        col_lower = col_original.lower().strip()
+        col_lower = str(col_original).lower().strip()
         if col_lower in mapeamentos:
             df_renamed = df_renamed.rename(columns={col_original: mapeamentos[col_lower]})
     
@@ -202,7 +184,7 @@ def padronizar_colunas(df, ano):
     for col in colunas_essenciais:
         if col not in df_renamed.columns:
             for df_col in df_renamed.columns:
-                if any(keyword in df_col.lower() for keyword in obter_keywords_coluna(col)):
+                if any(keyword in str(df_col).lower() for keyword in obter_keywords_coluna(col)):
                     df_renamed = df_renamed.rename(columns={df_col: col})
                     break
     
@@ -216,7 +198,7 @@ def padronizar_colunas(df, ano):
     
     return df_renamed
 
-def carregar_dados_multi_anos(pasta="."):
+def carregar_dados_multi_anos(pasta="data"):
     """Carrega dados de múltiplos anos de VBP"""
     print("\n📂 Buscando arquivos VBP...")
     
@@ -226,6 +208,9 @@ def carregar_dados_multi_anos(pasta="."):
     for pattern in patterns:
         arquivos_encontrados.extend(glob.glob(os.path.join(pasta, pattern)))
     
+    # Remover duplicatas
+    arquivos_encontrados = list(set(arquivos_encontrados))
+    
     dados_por_ano = {}
     
     for arquivo in arquivos_encontrados:
@@ -233,11 +218,16 @@ def carregar_dados_multi_anos(pasta="."):
         match = re.search(r'(20\d{2})', nome_arquivo)
         if match:
             ano = int(match.group(1))
+            
+            # Evitar processar o mesmo ano duas vezes
+            if ano in dados_por_ano:
+                continue
+                
             try:
                 print(f"    ✓ Carregando: {os.path.basename(arquivo)} ({ano})")
                 df = pd.read_excel(arquivo, skiprows=1)
                 
-                df.columns = [col.strip().replace('\n', '').replace('  ', ' ') 
+                df.columns = [str(col).strip().replace('\n', '').replace('  ', ' ') 
                              for col in df.columns]
                 
                 df = padronizar_colunas(df, ano)
@@ -308,11 +298,11 @@ todos_dados['PRODUTIVIDADE'] = todos_dados['PRODUCAO'] / todos_dados['AREA_PLANT
 todos_dados['VBP_POR_HA'] = todos_dados['VALOR_BRUTO'] / todos_dados['AREA_PLANTADA'].replace(0, 1)
 todos_dados['INTENSIDADE_ECONOMICA'] = todos_dados['VALOR_BRUTO'] / todos_dados['PRODUCAO'].replace(0, 1)
 
-# Criar variável target: RISCO_DESPERDICIO
+# Criar variável target
 print("\n🎯 Criando variável target: RISCO_DESPERDICIO")
 
 def classificar_risco(df_ano):
-    """Classifica risco de desperdício baseado em quantis múltiplos"""
+    """Classifica risco de desperdício"""
     prod_q = df_ano['PRODUCAO'].quantile([0.33, 0.66])
     area_q = df_ano['AREA_PLANTADA'].quantile([0.33, 0.66])
     valor_q = df_ano['VALOR_BRUTO'].quantile([0.33, 0.66])
@@ -344,8 +334,6 @@ todos_dados = pd.concat([classificar_risco(df) for ano, df in todos_dados.groupb
 
 print("\n📊 Distribuição de RISCO_DESPERDICIO:")
 print(todos_dados['RISCO_DESPERDICIO'].value_counts())
-print("\nPercentuais:")
-print(todos_dados['RISCO_DESPERDICIO'].value_counts(normalize=True) * 100)
 
 # =============================================================================
 # FASE 3: PREPARAÇÃO PARA MODELAGEM
@@ -383,119 +371,78 @@ print(f"   • Treino: {X_train.shape[0]:,} registros")
 print(f"   • Teste: {X_test.shape[0]:,} registros")
 
 # Normalização
-print("\n🔄 Aplicando normalizações (MinMax e Standard)...")
+print("\n🔄 Aplicando normalização MinMax...")
 minmax = MinMaxScaler()
-standard = StandardScaler()
 
-X_train_minmax = pd.DataFrame(minmax.fit_transform(X_train), columns=X_train.columns)
-X_test_minmax = pd.DataFrame(minmax.transform(X_test), columns=X_test.columns)
-
-X_train_standard = pd.DataFrame(standard.fit_transform(X_train), columns=X_train.columns)
-X_test_standard = pd.DataFrame(standard.transform(X_test), columns=X_test.columns)
+X_train_norm = pd.DataFrame(minmax.fit_transform(X_train), columns=X_train.columns)
+X_test_norm = pd.DataFrame(minmax.transform(X_test), columns=X_test.columns)
 
 print("   ✓ Dados normalizados!")
 
 # =============================================================================
-# FASE 4: SELEÇÃO DE FEATURES (Feature Selection)
+# FASE 4: SELEÇÃO DE FEATURES (APENAS MÉTODOS RÁPIDOS)
 # =============================================================================
 
 print("\n" + "=" * 100)
-print("FASE 4: SELEÇÃO DE FEATURES")
+print("FASE 4: SELEÇÃO DE FEATURES (Métodos Rápidos)")
 print("=" * 100)
 
-# RFE (Recursive Feature Elimination)
-print("\n🔍 1. RFE (Recursive Feature Elimination) - Aula 5")
-rf_base = RandomForestClassifier(n_estimators=50, random_state=42)
-rfe = RFE(estimator=rf_base, n_features_to_select=10, step=1)
-rfe.fit(X_train, y_train)
-selected_rfe = X_train.columns[rfe.support_]
-print(f"   Features selecionadas por RFE: {len(selected_rfe)}")
-print(f"   {list(selected_rfe)}")
-RESULTADOS['feature_selection']['RFE'] = list(selected_rfe)
-
-# SFS (Sequential Feature Selector)
-print("\n🔍 2. SFS (Sequential Feature Selector) - Aula 5")
-sfs = SequentialFeatureSelector(estimator=rf_base, n_features_to_select=7, 
-                                direction='forward', n_jobs=-1)
-sfs.fit(X_train, y_train)
-selected_sfs = X_train.columns[sfs.support_]
-print(f"   Features selecionadas por SFS: {len(selected_sfs)}")
-print(f"   {list(selected_sfs)}")
-RESULTADOS['feature_selection']['SFS'] = list(selected_sfs)
-
-# SelectKBest
-print("\n🔍 3. SelectKBest (F-statistic)")
-skb = SelectKBest(f_classif, k=10)
+# SelectKBest - RÁPIDO
+print("\n🔍 SelectKBest (F-statistic) - OTIMIZADO")
+skb = SelectKBest(f_classif, k=min(10, X_train.shape[1]))
 skb.fit(X_train, y_train)
 selected_skb = X_train.columns[skb.get_support()]
-print(f"   Features selecionadas por SelectKBest: {len(selected_skb)}")
+print(f"   Features selecionadas: {len(selected_skb)}")
 print(f"   {list(selected_skb)}")
 RESULTADOS['feature_selection']['SelectKBest'] = list(selected_skb)
 
-# Feature Importance (Random Forest)
-print("\n🔍 4. Feature Importance (Random Forest) - Aula 9 (XAI)")
-rf_base.fit(X_train, y_train)
+# Feature Importance (Random Forest) - RÁPIDO
+print("\n🔍 Feature Importance (Random Forest) - XAI")
+rf_importance = RandomForestClassifier(n_estimators=50, max_depth=10, random_state=42, n_jobs=-1)
+rf_importance.fit(X_train, y_train)
 feature_importance = pd.DataFrame({
     'feature': X_train.columns,
-    'importance': rf_base.feature_importances_
+    'importance': rf_importance.feature_importances_
 }).sort_values('importance', ascending=False)
 
 print("\n   Top 10 Features mais importantes:")
-print(feature_importance.head(10))
-RESULTADOS['feature_selection']['Importance'] = feature_importance.to_dict('records')[:10]
+print(feature_importance.head(10).to_string(index=False))
+RESULTADOS['feature_selection']['Importance'] = feature_importance.to_dict('records')[:15]
 
 # Visualizar importância
 plt.figure(figsize=(12, 6))
-top_features = feature_importance.head(15)
+top_features = feature_importance.head(min(15, len(feature_importance)))
 sns.barplot(data=top_features, x='importance', y='feature', palette='viridis')
 plt.title('Feature Importance - Random Forest (XAI)', fontsize=14, fontweight='bold')
 plt.xlabel('Importância')
 plt.ylabel('Feature')
 plt.tight_layout()
-plt.savefig('feature_importance.png', dpi=150, bbox_inches='tight')
-print("\n   ✓ Salvo: feature_importance.png")
+plt.savefig('outputs/feature_importance.png', dpi=150, bbox_inches='tight')
+print("\n   ✓ Salvo: outputs/feature_importance.png")
 plt.close()
 
 # =============================================================================
-# FASE 5: TREINAMENTO E COMPARAÇÃO DE MODELOS DE CLASSIFICAÇÃO
+# FASE 5: TREINAMENTO E COMPARAÇÃO DE MODELOS (OTIMIZADO)
 # =============================================================================
 
 print("\n" + "=" * 100)
-print("FASE 5: TREINAMENTO E COMPARAÇÃO DE MODELOS DE CLASSIFICAÇÃO")
+print("FASE 5: TREINAMENTO E COMPARAÇÃO DE MODELOS")
 print("=" * 100)
 
-# Codificar target para modelos que precisam
-le = LabelEncoder()
-y_train_encoded = le.fit_transform(y_train)
-y_test_encoded = le.transform(y_test)
-
-# Dicionário de modelos
+# Dicionário de modelos OTIMIZADOS
 modelos = {
-    # Aula 1 - Iris
-    'KNN': KNeighborsClassifier(n_neighbors=5),
+    'KNN': KNeighborsClassifier(n_neighbors=5, n_jobs=-1),
     'Decision Tree': DecisionTreeClassifier(max_depth=10, random_state=42),
-    
-    # Aula 1/2 - Diabetes/Predictive
-    'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
-    
-    # Aula 4 - Machine Failure
-    'Neural Network': MLPClassifier(hidden_layers=(100, 50), max_iter=500, random_state=42),
-    'SVM': SVC(kernel='rbf', probability=True, random_state=42),
-    
-    # Ensemble Methods - Aula 4
-    'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42),
-    'Extra Trees': ExtraTreesClassifier(n_estimators=100, max_depth=10, random_state=42),
-    'AdaBoost': AdaBoostClassifier(n_estimators=50, random_state=42),
-    'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, max_depth=5, random_state=42),
-    
-    # Naive Bayes
+    'Logistic Regression': LogisticRegression(max_iter=500, random_state=42, n_jobs=-1),
+    'Random Forest': RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42, n_jobs=-1),
+    'Extra Trees': ExtraTreesClassifier(n_estimators=100, max_depth=10, random_state=42, n_jobs=-1),
+    'Gradient Boosting': GradientBoostingClassifier(n_estimators=50, max_depth=5, random_state=42),
     'Naive Bayes': GaussianNB(),
 }
 
-# Adicionar XGBoost se disponível
+# XGBoost se disponível
 if XGBOOST_AVAILABLE:
-    modelos['XGBoost'] = XGBClassifier(n_estimators=100, max_depth=5, random_state=42, 
-                                      eval_metric='mlogloss')
+    modelos['XGBoost'] = XGBClassifier(n_estimators=50, max_depth=5, random_state=42, n_jobs=-1, eval_metric='mlogloss')
 
 # Treinar e avaliar todos os modelos
 resultados_comparacao = []
@@ -503,13 +450,14 @@ resultados_comparacao = []
 print("\n🤖 Treinando modelos...")
 for nome, modelo in modelos.items():
     print(f"\n   Treinando {nome}...")
+    start_time = time.time()
     
     try:
         # Treinar
-        modelo.fit(X_train_minmax, y_train)
+        modelo.fit(X_train_norm, y_train)
         
         # Predizer
-        y_pred = modelo.predict(X_test_minmax)
+        y_pred = modelo.predict(X_test_norm)
         
         # Métricas
         accuracy = accuracy_score(y_test, y_pred)
@@ -517,10 +465,12 @@ for nome, modelo in modelos.items():
         recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
         f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
         
-        # Cross-validation
-        cv_scores = cross_val_score(modelo, X_train_minmax, y_train, cv=5, scoring='accuracy')
+        # Cross-validation (3-fold para ser mais rápido)
+        cv_scores = cross_val_score(modelo, X_train_norm, y_train, cv=3, scoring='accuracy', n_jobs=-1)
         cv_mean = cv_scores.mean()
         cv_std = cv_scores.std()
+        
+        elapsed_time = time.time() - start_time
         
         # Armazenar resultados
         resultado = {
@@ -530,15 +480,13 @@ for nome, modelo in modelos.items():
             'Recall': recall,
             'F1-Score': f1,
             'CV Mean': cv_mean,
-            'CV Std': cv_std
+            'CV Std': cv_std,
+            'Tempo (s)': elapsed_time
         }
         resultados_comparacao.append(resultado)
         
-        print(f"      ✓ Accuracy: {accuracy:.4f}")
-        print(f"      ✓ F1-Score: {f1:.4f}")
-        print(f"      ✓ CV Mean: {cv_mean:.4f} (±{cv_std:.4f})")
+        print(f"      ✓ Accuracy: {accuracy:.4f} | F1: {f1:.4f} | Tempo: {elapsed_time:.1f}s")
         
-        # Armazenar no dicionário global
         RESULTADOS['models'][nome] = resultado
         
     except Exception as e:
@@ -553,69 +501,52 @@ print("📊 COMPARAÇÃO DE TODOS OS MODELOS")
 print("=" * 100)
 print(df_comparacao.to_string(index=False))
 
-# Salvar comparação em CSV
-df_comparacao.to_csv('comparacao_modelos.csv', index=False)
-print("\n✓ Salvo: comparacao_modelos.csv")
+# Salvar comparação
+df_comparacao.to_csv('data/comparacao_modelos.csv', index=False)
+print("\n✓ Salvo: data/comparacao_modelos.csv")
 
 # =============================================================================
-# VISUALIZAÇÃO DA COMPARAÇÃO DE MODELOS
+# VISUALIZAÇÃO DA COMPARAÇÃO
 # =============================================================================
 
-print("\n📊 Criando visualizações comparativas...")
+print("\n📊 Criando visualizações...")
 
-# Gráfico 1: Comparação de Métricas
+# Gráfico 1: Comparação de Accuracy
 fig, axes = plt.subplots(2, 2, figsize=(16, 12))
 
-# Accuracy
 df_sorted = df_comparacao.sort_values('Accuracy')
 axes[0, 0].barh(df_sorted['Modelo'], df_sorted['Accuracy'], color='skyblue')
 axes[0, 0].set_xlabel('Accuracy')
 axes[0, 0].set_title('Comparação de Accuracy', fontweight='bold')
 axes[0, 0].grid(axis='x', alpha=0.3)
 
-# F1-Score
 df_sorted = df_comparacao.sort_values('F1-Score')
 axes[0, 1].barh(df_sorted['Modelo'], df_sorted['F1-Score'], color='lightcoral')
 axes[0, 1].set_xlabel('F1-Score')
 axes[0, 1].set_title('Comparação de F1-Score', fontweight='bold')
 axes[0, 1].grid(axis='x', alpha=0.3)
 
-# Precision
 df_sorted = df_comparacao.sort_values('Precision')
 axes[1, 0].barh(df_sorted['Modelo'], df_sorted['Precision'], color='lightgreen')
 axes[1, 0].set_xlabel('Precision')
 axes[1, 0].set_title('Comparação de Precision', fontweight='bold')
 axes[1, 0].grid(axis='x', alpha=0.3)
 
-# Recall
-df_sorted = df_comparacao.sort_values('Recall')
-axes[1, 1].barh(df_sorted['Modelo'], df_sorted['Recall'], color='plum')
-axes[1, 1].set_xlabel('Recall')
-axes[1, 1].set_title('Comparação de Recall', fontweight='bold')
+df_sorted = df_comparacao.sort_values('CV Mean')
+axes[1, 1].barh(df_sorted['Modelo'], df_sorted['CV Mean'], color='plum')
+axes[1, 1].set_xlabel('CV Score')
+axes[1, 1].set_title('Cross-Validation', fontweight='bold')
 axes[1, 1].grid(axis='x', alpha=0.3)
 
 plt.tight_layout()
-plt.savefig('comparacao_metricas.png', dpi=150, bbox_inches='tight')
-print("   ✓ Salvo: comparacao_metricas.png")
-plt.close()
-
-# Gráfico 2: Cross-Validation Scores
-plt.figure(figsize=(12, 6))
-df_sorted = df_comparacao.sort_values('CV Mean')
-plt.barh(df_sorted['Modelo'], df_sorted['CV Mean'], 
-         xerr=df_sorted['CV Std'], color='steelblue', alpha=0.7)
-plt.xlabel('Cross-Validation Score (Mean ± Std)')
-plt.title('Comparação de Cross-Validation Scores', fontsize=14, fontweight='bold')
-plt.grid(axis='x', alpha=0.3)
-plt.tight_layout()
-plt.savefig('comparacao_cv.png', dpi=150, bbox_inches='tight')
-print("   ✓ Salvo: comparacao_cv.png")
+plt.savefig('outputs/comparacao_metricas.png', dpi=150, bbox_inches='tight')
+print("   ✓ Salvo: outputs/comparacao_metricas.png")
 plt.close()
 
 # Matriz de confusão do melhor modelo
 melhor_modelo_nome = df_comparacao.iloc[0]['Modelo']
 melhor_modelo = modelos[melhor_modelo_nome]
-y_pred_melhor = melhor_modelo.predict(X_test_minmax)
+y_pred_melhor = melhor_modelo.predict(X_test_norm)
 
 plt.figure(figsize=(10, 8))
 cm = confusion_matrix(y_test, y_pred_melhor)
@@ -626,164 +557,16 @@ plt.title(f'Matriz de Confusão - {melhor_modelo_nome}', fontsize=14, fontweight
 plt.ylabel('Real')
 plt.xlabel('Predito')
 plt.tight_layout()
-plt.savefig('confusion_matrix_melhor.png', dpi=150, bbox_inches='tight')
-print("   ✓ Salvo: confusion_matrix_melhor.png")
+plt.savefig('outputs/confusion_matrix_melhor.png', dpi=150, bbox_inches='tight')
+print("   ✓ Salvo: outputs/confusion_matrix_melhor.png")
 plt.close()
 
 # =============================================================================
-# FASE 6: ENSEMBLE METHODS - VOTING E BAGGING (Aula 4)
+# ANÁLISE TEMPORAL
 # =============================================================================
 
 print("\n" + "=" * 100)
-print("FASE 6: ENSEMBLE METHODS - VOTING E BAGGING")
-print("=" * 100)
-
-# Voting Classifier - Hard Voting
-print("\n🗳 Voting Classifier (Hard)...")
-voting_hard = VotingClassifier(
-    estimators=[
-        ('rf', RandomForestClassifier(n_estimators=50, random_state=42)),
-        ('knn', KNeighborsClassifier(n_neighbors=5)),
-        ('dt', DecisionTreeClassifier(max_depth=10, random_state=42))
-    ],
-    voting='hard'
-)
-voting_hard.fit(X_train_minmax, y_train)
-acc_voting_hard = voting_hard.score(X_test_minmax, y_test)
-print(f"   ✓ Accuracy (Hard Voting): {acc_voting_hard:.4f}")
-RESULTADOS['models']['Voting Hard'] = {'Accuracy': acc_voting_hard}
-
-# Voting Classifier - Soft Voting
-print("\n🗳 Voting Classifier (Soft)...")
-voting_soft = VotingClassifier(
-    estimators=[
-        ('rf', RandomForestClassifier(n_estimators=50, random_state=42)),
-        ('knn', KNeighborsClassifier(n_neighbors=5)),
-        ('dt', DecisionTreeClassifier(max_depth=10, random_state=42))
-    ],
-    voting='soft'
-)
-voting_soft.fit(X_train_minmax, y_train)
-acc_voting_soft = voting_soft.score(X_test_minmax, y_test)
-print(f"   ✓ Accuracy (Soft Voting): {acc_voting_soft:.4f}")
-RESULTADOS['models']['Voting Soft'] = {'Accuracy': acc_voting_soft}
-
-# Bagging
-print("\n🎒 Bagging Classifier...")
-bagging = BaggingClassifier(
-    estimator=DecisionTreeClassifier(max_depth=10, random_state=42),
-    n_estimators=50,
-    random_state=42
-)
-bagging.fit(X_train_minmax, y_train)
-acc_bagging = bagging.score(X_test_minmax, y_test)
-print(f"   ✓ Accuracy (Bagging): {acc_bagging:.4f}")
-RESULTADOS['models']['Bagging'] = {'Accuracy': acc_bagging}
-
-# =============================================================================
-# FASE 7: CLUSTERING (Aula 6 - Wine Clustering, Aula 7)
-# =============================================================================
-
-print("\n" + "=" * 100)
-print("FASE 7: CLUSTERING - ANÁLISE NÃO SUPERVISIONADA")
-print("=" * 100)
-
-# Preparar dados para clustering (usar apenas features numéricas)
-X_clustering = X_train_minmax.copy()
-
-# K-Means
-print("\n🔵 K-Means Clustering...")
-kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-clusters_kmeans = kmeans.fit_predict(X_clustering)
-silhouette_kmeans = silhouette_score(X_clustering, clusters_kmeans)
-davies_bouldin_kmeans = davies_bouldin_score(X_clustering, clusters_kmeans)
-calinski_kmeans = calinski_harabasz_score(X_clustering, clusters_kmeans)
-
-print(f"   ✓ Silhouette Score: {silhouette_kmeans:.4f}")
-print(f"   ✓ Davies-Bouldin Index: {davies_bouldin_kmeans:.4f}")
-print(f"   ✓ Calinski-Harabasz Index: {calinski_kmeans:.4f}")
-
-RESULTADOS['clustering']['K-Means'] = {
-    'Silhouette': silhouette_kmeans,
-    'Davies-Bouldin': davies_bouldin_kmeans,
-    'Calinski-Harabasz': calinski_kmeans
-}
-
-# Hierarchical Clustering
-print("\n🌳 Hierarchical Clustering (Agglomerative)...")
-hierarchical = AgglomerativeClustering(n_clusters=3)
-clusters_hierarchical = hierarchical.fit_predict(X_clustering)
-silhouette_hierarchical = silhouette_score(X_clustering, clusters_hierarchical)
-davies_bouldin_hierarchical = davies_bouldin_score(X_clustering, clusters_hierarchical)
-calinski_hierarchical = calinski_harabasz_score(X_clustering, clusters_hierarchical)
-
-print(f"   ✓ Silhouette Score: {silhouette_hierarchical:.4f}")
-print(f"   ✓ Davies-Bouldin Index: {davies_bouldin_hierarchical:.4f}")
-print(f"   ✓ Calinski-Harabasz Index: {calinski_hierarchical:.4f}")
-
-RESULTADOS['clustering']['Hierarchical'] = {
-    'Silhouette': silhouette_hierarchical,
-    'Davies-Bouldin': davies_bouldin_hierarchical,
-    'Calinski-Harabasz': calinski_hierarchical
-}
-
-# PCA para visualização
-print("\n🔍 Aplicando PCA para visualização...")
-pca = PCA(n_components=2)
-X_pca = pca.fit_transform(X_clustering)
-
-# Visualizar clusters
-fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-
-# K-Means
-scatter1 = axes[0].scatter(X_pca[:, 0], X_pca[:, 1], c=clusters_kmeans, 
-                          cmap='viridis', alpha=0.6, s=30)
-axes[0].set_title(f'K-Means Clustering (Silhouette: {silhouette_kmeans:.3f})', 
-                 fontweight='bold')
-axes[0].set_xlabel('PC1')
-axes[0].set_ylabel('PC2')
-plt.colorbar(scatter1, ax=axes[0], label='Cluster')
-
-# Hierarchical
-scatter2 = axes[1].scatter(X_pca[:, 0], X_pca[:, 1], c=clusters_hierarchical, 
-                          cmap='plasma', alpha=0.6, s=30)
-axes[1].set_title(f'Hierarchical Clustering (Silhouette: {silhouette_hierarchical:.3f})', 
-                 fontweight='bold')
-axes[1].set_xlabel('PC1')
-axes[1].set_ylabel('PC2')
-plt.colorbar(scatter2, ax=axes[1], label='Cluster')
-
-plt.tight_layout()
-plt.savefig('clustering_comparison.png', dpi=150, bbox_inches='tight')
-print("\n   ✓ Salvo: clustering_comparison.png")
-plt.close()
-
-# Método do cotovelo para K-Means
-print("\n📊 Método do Cotovelo para determinar número ótimo de clusters...")
-wcss = []
-k_range = range(1, 11)
-for k in k_range:
-    kmeans_temp = KMeans(n_clusters=k, random_state=42, n_init=10)
-    kmeans_temp.fit(X_clustering)
-    wcss.append(kmeans_temp.inertia_)
-
-plt.figure(figsize=(10, 6))
-plt.plot(k_range, wcss, marker='o', linewidth=2, markersize=8)
-plt.xlabel('Número de Clusters (k)')
-plt.ylabel('WCSS (Inércia)')
-plt.title('Método do Cotovelo - K-Means', fontsize=14, fontweight='bold')
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.savefig('elbow_method.png', dpi=150, bbox_inches='tight')
-print("   ✓ Salvo: elbow_method.png")
-plt.close()
-
-# =============================================================================
-# FASE 8: ANÁLISE TEMPORAL E TENDÊNCIAS
-# =============================================================================
-
-print("\n" + "=" * 100)
-print("FASE 8: ANÁLISE TEMPORAL E TENDÊNCIAS")
+print("FASE 6: ANÁLISE TEMPORAL")
 print("=" * 100)
 
 # Agregar dados por ano
@@ -804,50 +587,41 @@ risco_pct_ano = risco_por_ano.div(risco_por_ano.sum(axis=1), axis=0) * 100
 # Visualização temporal
 fig, axes = plt.subplots(2, 2, figsize=(16, 12))
 
-# VBP Total
-axes[0, 0].plot(dados_anuais['ANO'], dados_anuais['VALOR_BRUTO'] / 1e9, 
-               marker='o', linewidth=2, markersize=8)
-axes[0, 0].set_title('Evolução do VBP Total', fontsize=12, fontweight='bold')
+axes[0, 0].plot(dados_anuais['ANO'], dados_anuais['VALOR_BRUTO'] / 1e9, marker='o', linewidth=2)
+axes[0, 0].set_title('Evolução do VBP Total', fontweight='bold')
 axes[0, 0].set_ylabel('VBP (Bilhões R$)')
 axes[0, 0].grid(True, alpha=0.3)
 
-# Produção Total
-axes[0, 1].plot(dados_anuais['ANO'], dados_anuais['PRODUCAO'] / 1e6, 
-               marker='o', linewidth=2, markersize=8, color='green')
-axes[0, 1].set_title('Evolução da Produção Total', fontsize=12, fontweight='bold')
-axes[0, 1].set_ylabel('Produção (Milhões ton)')
+axes[0, 1].plot(dados_anuais['ANO'], dados_anuais['PRODUCAO'] / 1e6, marker='o', linewidth=2, color='green')
+axes[0, 1].set_title('Evolução da Produção Total', fontweight='bold')
+axes[0, 1].set_ylabel('Produção (Milhões)')
 axes[0, 1].grid(True, alpha=0.3)
 
-# Diversidade Produtiva
-axes[1, 0].plot(dados_anuais['ANO'], dados_anuais['diversidade_produtiva'], 
-               marker='o', linewidth=2, markersize=8, color='purple')
-axes[1, 0].set_title('Evolução da Diversidade Produtiva', fontsize=12, fontweight='bold')
+axes[1, 0].plot(dados_anuais['ANO'], dados_anuais['diversidade_produtiva'], marker='o', linewidth=2, color='purple')
+axes[1, 0].set_title('Diversidade Produtiva', fontweight='bold')
 axes[1, 0].set_ylabel('Diversidade Média')
 axes[1, 0].set_xlabel('Ano')
 axes[1, 0].grid(True, alpha=0.3)
 
-# Distribuição de Risco
-risco_pct_ano.plot(kind='bar', stacked=True, ax=axes[1, 1], 
-                  color=['#FF6B6B', '#4ECDC4', '#FFE66D'])
-axes[1, 1].set_title('Evolução da Distribuição de Risco', fontsize=12, fontweight='bold')
+risco_pct_ano.plot(kind='bar', stacked=True, ax=axes[1, 1], color=['#FF6B6B', '#4ECDC4', '#FFE66D'])
+axes[1, 1].set_title('Distribuição de Risco por Ano', fontweight='bold')
 axes[1, 1].set_ylabel('Percentual (%)')
 axes[1, 1].set_xlabel('Ano')
 axes[1, 1].legend(title='Risco')
-axes[1, 1].grid(True, alpha=0.3, axis='y')
 
 plt.tight_layout()
-plt.savefig('evolucao_temporal.png', dpi=150, bbox_inches='tight')
-print("\n   ✓ Salvo: evolucao_temporal.png")
+plt.savefig('outputs/evolucao_temporal.png', dpi=150, bbox_inches='tight')
+print("   ✓ Salvo: outputs/evolucao_temporal.png")
 plt.close()
 
 # =============================================================================
-# SALVAR RESULTADOS EM JSON
+# SALVAR RESULTADOS
 # =============================================================================
 
-print("\n💾 Salvando resultados em JSON...")
-with open('resultados_ml.json', 'w', encoding='utf-8') as f:
-    json.dump(RESULTADOS, f, indent=4, ensure_ascii=False)
-print("   ✓ Salvo: resultados_ml.json")
+print("\n💾 Salvando resultados...")
+with open('data/resultados_ml.json', 'w', encoding='utf-8') as f:
+    json.dump(RESULTADOS, f, indent=4, ensure_ascii=False, default=str)
+print("   ✓ Salvo: data/resultados_ml.json")
 
 # =============================================================================
 # RESUMO FINAL
@@ -857,37 +631,25 @@ print("\n" + "=" * 100)
 print("✅ ANÁLISE COMPLETA FINALIZADA")
 print("=" * 100)
 
-print(f"\n📊 RESUMO DOS RESULTADOS:")
-print(f"   • {len(modelos)} modelos de classificação treinados e comparados")
+print(f"\n📊 RESUMO:")
+print(f"   • {len(modelos)} modelos treinados e comparados")
 print(f"   • Melhor modelo: {melhor_modelo_nome} (Accuracy: {df_comparacao.iloc[0]['Accuracy']:.4f})")
-print(f"   • 3 métodos de feature selection aplicados")
-print(f"   • 2 algoritmos de clustering avaliados")
-print(f"   • {len(dados_por_ano)} anos de dados analisados")
+print(f"   • {len(dados_por_ano)} anos de dados analisados ({min(dados_por_ano.keys())}-{max(dados_por_ano.keys())})")
+print(f"   • {len(todos_dados):,} registros processados")
 
 print("\n📁 ARQUIVOS GERADOS:")
 arquivos = [
-    'feature_importance.png',
-    'comparacao_metricas.png',
-    'comparacao_cv.png',
-    'confusion_matrix_melhor.png',
-    'clustering_comparison.png',
-    'elbow_method.png',
-    'evolucao_temporal.png',
-    'comparacao_modelos.csv',
-    'resultados_ml.json'
+    'outputs/feature_importance.png',
+    'outputs/comparacao_metricas.png',
+    'outputs/confusion_matrix_melhor.png',
+    'outputs/evolucao_temporal.png',
+    'data/comparacao_modelos.csv',
+    'data/resultados_ml.json'
 ]
 for arquivo in arquivos:
     print(f"   ✓ {arquivo}")
 
-print("\n🎯 METODOLOGIAS APLICADAS:")
-print("   1. Classificação: KNN, Decision Tree, Random Forest, SVM, Neural Network, etc.")
-print("   2. Ensemble: Voting, Bagging, Boosting (AdaBoost, Gradient Boosting, XGBoost)")
-print("   3. Feature Selection: RFE, SFS, SelectKBest, Feature Importance")
-print("   4. Clustering: K-Means, Hierarchical")
-print("   5. Dimensionality Reduction: PCA")
-print("   6. Preprocessing: MinMaxScaler, StandardScaler, One-Hot Encoding")
-print("   7. Validation: Train-Test Split, Cross-Validation")
+print("\n🎯 PRÓXIMO PASSO:")
+print("   Abra o arquivo: views/dashboard_final.html")
 
 print("\n" + "=" * 100)
-print("Sistema desenvolvido baseado nas Aulas 1-9 de Machine Learning")
-print("=" * 100)
